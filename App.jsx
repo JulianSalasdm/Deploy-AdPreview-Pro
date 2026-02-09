@@ -54,30 +54,38 @@ const App = () => {
   const [activeTab, setActiveTab] = useState('preview');
 
   const findTagInMatrix = (rows) => {
-    let candidates = [];
+    let bestCandidate = { text: '', score: -1 };
+    
     rows.forEach(row => {
       row.forEach(cell => {
         if (cell && typeof cell === 'string') {
           let score = 0;
           const lower = cell.toLowerCase();
-          if (lower.includes('<script')) score += 10;
-          if (lower.includes('<iframe')) score += 10;
-          if (lower.includes('document.write')) score += 5;
-          if (lower.includes('googletag')) score += 5;
-          if (lower.includes('doubleclick')) score += 5;
-          if (lower.includes('adsbygoogle')) score += 5;
-          if (lower.includes('src=')) score += 2;
-          if (lower.includes('href=')) score += 2;
           
-          if (score > 0) {
-            candidates.push({ text: cell, score: score });
+          // Scoring system to find the best ad tag candidate
+          if (lower.includes('<script')) score += 20;
+          if (lower.includes('<iframe')) score += 20;
+          if (lower.includes('document.write')) score += 10;
+          if (lower.includes('googletag')) score += 10;
+          if (lower.includes('doubleclick')) score += 10;
+          if (lower.includes('adsbygoogle')) score += 10;
+          if (lower.includes('src=')) score += 5;
+          if (lower.includes('href=')) score += 5;
+          if (cell.length > 50) score += 2; // longer strings are more likely to be tags
+
+          if (score > bestCandidate.score) {
+            bestCandidate = { text: cell, score: score };
           }
         }
       });
     });
 
-    candidates.sort((a, b) => b.score - a.score || b.text.length - a.text.length);
-    return candidates.length > 0 ? candidates[0].text : (rows[0] && rows[0][0] ? String(rows[0][0]) : '');
+    // Fallback if no high-score candidate is found but there is data
+    if (bestCandidate.score <= 0 && rows.length > 0 && rows[0][0]) {
+      return String(rows[0][0]);
+    }
+    
+    return bestCandidate.text;
   };
 
   const processZip = async (file) => {
@@ -159,25 +167,44 @@ const App = () => {
     const file = files[0];
     if (!file) return;
     const name = file.name.toLowerCase();
-    if (name.endsWith('.zip')) processZip(file);
-    else if (name.endsWith('.csv')) {
+    setError(null);
+    
+    if (name.endsWith('.zip')) {
+        processZip(file);
+    } else if (name.endsWith('.csv')) {
       Papa.parse(file, {
         complete: (res) => {
           const tag = findTagInMatrix(res.data);
+          if (!tag) {
+              setError("No se encontró ningún tag válido en el CSV");
+              return;
+          }
           setPreviewData({ type: AdType.CSV, content: tag, fileName: file.name });
           setActiveTab('preview');
-        }
+        },
+        error: () => setError("Error al leer el archivo CSV")
       });
     } else if (name.endsWith('.xlsx') || name.endsWith('.xls')) {
       const reader = new FileReader();
       reader.onload = (e) => {
-        const wb = XLSX.read(e.target.result);
-        const ws = wb.Sheets[wb.SheetNames[0]];
-        const rows = XLSX.utils.sheet_to_json(ws, { header: 1 });
-        setPreviewData({ type: AdType.TAG, content: findTagInMatrix(rows), fileName: file.name });
-        setActiveTab('preview');
+        try {
+            const wb = XLSX.read(e.target.result);
+            const ws = wb.Sheets[wb.SheetNames[0]];
+            const rows = XLSX.utils.sheet_to_json(ws, { header: 1 });
+            const tag = findTagInMatrix(rows);
+            if (!tag) {
+                setError("No se encontró ningún tag válido en el Excel");
+                return;
+            }
+            setPreviewData({ type: AdType.TAG, content: tag, fileName: file.name });
+            setActiveTab('preview');
+        } catch(err) {
+            setError("Error al procesar el archivo Excel");
+        }
       };
       reader.readAsArrayBuffer(file);
+    } else {
+        setError("Formato de archivo no soportado (.zip, .csv, .xlsx)");
     }
   }, []);
 
@@ -201,7 +228,7 @@ const App = () => {
             ) : (
               <Controls selectedSize={selectedSize} setSelectedSize={setSelectedSize} reset={() => setPreviewData(null)} previewData={previewData} />
             )}
-            {error && <div className="mt-4 p-4 bg-red-500/10 border border-red-500/50 rounded-lg text-red-200 text-sm flex gap-3"><AlertCircle className="w-5 h-5" /> <span>{error}</span></div>}
+            {error && <div className="mt-4 p-4 bg-red-500/10 border border-red-500/50 rounded-lg text-red-200 text-sm flex gap-3"><AlertCircle className="w-5 h-5 shrink-0" /> <span>{error}</span></div>}
           </div>
         </aside>
 
@@ -213,7 +240,7 @@ const App = () => {
                   <button onClick={() => setActiveTab('preview')} className={`h-14 border-b-2 transition-all flex items-center gap-2 px-1 ${activeTab === 'preview' ? 'text-[#9500cb] border-[#9500cb] font-bold' : 'text-gray-400 border-transparent hover:text-white'}`}><Monitor className="w-4 h-4" /> Preview</button>
                   <button onClick={() => setActiveTab('insights')} className={`h-14 border-b-2 transition-all flex items-center gap-2 px-1 ${activeTab === 'insights' ? 'text-[#9500cb] border-[#9500cb] font-bold' : 'text-gray-400 border-transparent hover:text-white'}`}><Layers className="w-4 h-4" /> Insights AI</button>
                 </div>
-                <div className="text-xs bg-[#222] px-3 py-1 rounded-full border border-[#333] text-gray-400 font-mono">{previewData.fileName}</div>
+                <div className="text-xs bg-[#222] px-3 py-1 rounded-full border border-[#333] text-gray-400 font-mono truncate max-w-[200px]">{previewData.fileName}</div>
               </div>
               <div className="flex-1 bg-[radial-gradient(#2a2a2a_1px,transparent_1px)] [background-size:24px_24px] relative bg-[#121212]">
                 {activeTab === 'preview' ? (

@@ -37,12 +37,22 @@ const PreviewWindow = ({ previewData, size }) => {
           <meta charset="utf-8">
           <meta name="viewport" content="width=device-width, initial-scale=1.0">
           <style>
-            body, html { margin: 0; padding: 0; height: 100%; width: 100%; display: flex; justify-content: center; align-items: center; background: #fff; overflow: hidden; }
+            body, html { 
+              margin: 0; 
+              padding: 0; 
+              height: 100%; 
+              width: 100%; 
+              display: flex; 
+              justify-content: center; 
+              align-items: center; 
+              background: #fff; 
+              overflow: hidden; 
+            }
             * { box-sizing: border-box; }
           </style>
         </head>
         <body>
-          <div style="width:100%; height:100%; display: flex; align-items: center; justify-content: center;">
+          <div id="ad-container" style="width:100%; height:100%; display: flex; align-items: center; justify-content: center;">
             ${previewData.content}
           </div>
         </body>
