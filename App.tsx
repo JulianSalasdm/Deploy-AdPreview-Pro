@@ -1,6 +1,6 @@
 
-import React, { useState, useCallback, useEffect } from 'react';
-import { Upload, Monitor, FileCode, CheckCircle2, AlertCircle, Info, RefreshCcw, Layers, Download } from 'lucide-react';
+import React, { useState, useCallback } from 'react';
+import { Upload, Monitor, CheckCircle2, AlertCircle, Info } from 'lucide-react';
 import JSZip from 'jszip';
 import Papa from 'papaparse';
 import * as XLSX from 'xlsx';
@@ -9,7 +9,6 @@ import Header from './components/Header';
 import DropZone from './components/DropZone';
 import PreviewWindow from './components/PreviewWindow';
 import Controls from './components/Controls';
-import InsightPanel from './components/InsightPanel';
 
 const getMimeType = (filename: string): string => {
   const ext = filename.split('.').pop()?.toLowerCase();
@@ -30,18 +29,14 @@ const getMimeType = (filename: string): string => {
   }
 };
 
-/**
- * Calculates a relative path from source to target.
- * Useful for resolving '../fonts/font.woff' from 'css/style.css'
- */
 const getRelativePathVariations = (sourceFile: string, targetFile: string): string[] => {
   const variations = new Set<string>();
-  variations.add(targetFile); // Absolute in ZIP
+  variations.add(targetFile);
 
   const sourceParts = sourceFile.split('/');
   const targetParts = targetFile.split('/');
   
-  sourceParts.pop(); // Remove filename
+  sourceParts.pop(); 
   
   let i = 0;
   while (i < sourceParts.length && i < targetParts.length && sourceParts[i] === targetParts[i]) {
@@ -53,10 +48,9 @@ const getRelativePathVariations = (sourceFile: string, targetFile: string): stri
   
   if (rel) {
     variations.add(rel);
-    variations.add('./' + rel.replace(/^\.\.\//, '')); // handle cases like ./assets/img.png
+    variations.add('./' + rel.replace(/^\.\.\//, ''));
   }
 
-  // Handle simple filename if in same directory
   if (targetParts.length > 0) {
     variations.add(targetParts[targetParts.length - 1]);
   }
@@ -69,7 +63,6 @@ const App: React.FC = () => {
   const [previewData, setPreviewData] = useState<PreviewData | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'preview' | 'insights'>('preview');
 
   const processZip = async (file: File) => {
     setIsProcessing(true);
@@ -108,7 +101,6 @@ const App: React.FC = () => {
           
           variations.forEach(v => {
             const escaped = escapeRegExp(v);
-            // Enhanced regex to catch url(), src="", href="", and raw strings in JS
             const regex = new RegExp(`(['"\\(\\s=])${escaped}(['"\\)\\s])`, 'g');
             newContent = newContent.replace(regex, `$1${blobUrl}$2`);
           });
@@ -116,7 +108,6 @@ const App: React.FC = () => {
         return newContent;
       };
 
-      // Pass 1: Static assets (images, fonts)
       assetNames.forEach(name => {
         const mime = getMimeType(name);
         if (!mime.startsWith('text/') && !mime.endsWith('javascript')) {
@@ -124,7 +115,6 @@ const App: React.FC = () => {
         }
       });
 
-      // Pass 2: CSS (can reference fonts/images)
       assetNames.forEach(name => {
         if (name.endsWith('.css') && fileData[name].content) {
           const updated = rewriteContent(fileData[name].content!, name);
@@ -133,7 +123,6 @@ const App: React.FC = () => {
         }
       });
 
-      // Pass 3: JS (can reference anything)
       assetNames.forEach(name => {
         if (name.endsWith('.js') && fileData[name].content) {
           const updated = rewriteContent(fileData[name].content!, name);
@@ -142,7 +131,6 @@ const App: React.FC = () => {
         }
       });
 
-      // Pass 4: HTML
       const htmlFiles = assetNames.filter(n => n.toLowerCase().endsWith('.html'));
       const mainHtmlName = htmlFiles.find(n => n.toLowerCase() === 'index.html') || htmlFiles[0];
 
@@ -158,7 +146,6 @@ const App: React.FC = () => {
         assets: finalAssets,
         fileName: file.name
       });
-      setActiveTab('preview');
     } catch (err: any) {
       setError(err.message || 'Error al procesar el archivo ZIP.');
     } finally {
@@ -192,7 +179,6 @@ const App: React.FC = () => {
           const tag = findTagInMatrix(results.data as any[][]);
           if (!tag) throw new Error('No se detectó un tag de publicidad en el CSV.');
           setPreviewData({ type: AdType.CSV, content: tag, fileName: file.name });
-          setActiveTab('preview');
         } catch (err: any) {
           setError(err.message || 'Error al procesar el archivo CSV.');
         } finally {
@@ -220,7 +206,6 @@ const App: React.FC = () => {
       if (!tag) throw new Error('No se detectó un tag de publicidad en el Excel.');
       
       setPreviewData({ type: AdType.TAG, content: tag, fileName: file.name });
-      setActiveTab('preview');
     } catch (err: any) {
       setError(err.message || 'Error al procesar el archivo Excel.');
     } finally {
@@ -254,7 +239,6 @@ const App: React.FC = () => {
       <Header />
       
       <main className="flex-1 flex overflow-hidden">
-        {/* Sidebar */}
         <aside className="w-80 border-r border-[#2a2a2a] bg-[#181818] flex flex-col z-20">
           <div className="p-6 flex-1 overflow-y-auto custom-scrollbar">
             {!previewData ? (
@@ -292,49 +276,31 @@ const App: React.FC = () => {
           </div>
           
           <div className="p-4 border-t border-[#2a2a2a] text-xs text-gray-500 flex justify-between items-center bg-[#181818]">
-            <span>Powered by Gemini 2.0</span>
+            <span>AdPreview Pro</span>
             <span className="flex items-center gap-1 font-mono">
-              v2.0.0 <Info className="w-3 h-3" />
+              v2.1.0 <Info className="w-3 h-3" />
             </span>
           </div>
         </aside>
 
-        {/* Main Content */}
         <section className="flex-1 relative overflow-hidden flex flex-col">
           {previewData ? (
             <>
-              {/* Tab Bar */}
               <div className="h-14 border-b border-[#2a2a2a] flex items-center px-6 justify-between bg-[#121212]/90 backdrop-blur z-10 shrink-0">
                 <div className="flex gap-6">
-                  <button 
-                    onClick={() => setActiveTab('preview')}
-                    className={`h-14 border-b-2 transition-all flex items-center gap-2 px-1 ${activeTab === 'preview' ? 'text-[#9500cb] border-[#9500cb] font-bold' : 'text-gray-400 border-transparent hover:text-white'}`}
-                  >
+                  <div className="h-14 border-b-2 text-[#9500cb] border-[#9500cb] font-bold transition-all flex items-center gap-2 px-1">
                     <Monitor className="w-4 h-4" /> Preview
-                  </button>
-                  <button 
-                    onClick={() => setActiveTab('insights')}
-                    className={`h-14 border-b-2 transition-all flex items-center gap-2 px-1 ${activeTab === 'insights' ? 'text-[#9500cb] border-[#9500cb] font-bold' : 'text-gray-400 border-transparent hover:text-white'}`}
-                  >
-                    <Layers className="w-4 h-4" /> Insights AI
-                  </button>
+                  </div>
                 </div>
                 <div className="text-xs bg-[#222] px-3 py-1 rounded-full border border-[#333] text-gray-400 font-mono">
                   {previewData.fileName}
                 </div>
               </div>
 
-              {/* Viewport */}
               <div className="flex-1 bg-[radial-gradient(#2a2a2a_1px,transparent_1px)] [background-size:24px_24px] relative bg-[#121212]">
-                {activeTab === 'preview' ? (
-                  <div className="absolute inset-0 flex items-center justify-center">
-                    <PreviewWindow previewData={previewData} size={selectedSize} />
-                  </div>
-                ) : (
-                  <div className="absolute inset-0 p-8 overflow-y-auto custom-scrollbar flex justify-center">
-                    <InsightPanel previewData={previewData} />
-                  </div>
-                )}
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <PreviewWindow previewData={previewData} size={selectedSize} />
+                </div>
               </div>
             </>
           ) : (
